@@ -126,7 +126,7 @@ extern "C" {
 
 // Config: Enable logging on operating system sockets
 // Note: Optional since this may not be needed by most applications
-#ifndef MICRO_LOG_SOCKETS
+#ifdef MICRO_LOG_SOCKETS
   #ifdef _WIN32
     // Windows
     #include <winsock2.h>
