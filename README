@@ -1,0 +1,105 @@
+micro-log.h
+-----------
+
+Header-only, configurable, thread safe logging framework in C99.
+
+```
+2025-09-21 22:32:36 INFO   | Logger initialized
+2025-09-21 22:32:36 INFO   | I’d just like to interject for a moment...
+2025-09-21 22:32:36 INFO   | Closing logger
+```
+
+Author:  Giovanni Santini
+Mail:    giovanni.santini@proton.me
+License: MIT
+
+
+Features
+--------
+
+ - Multiple logging levels
+ - Log to stdout, files, UNIX sockets, or network sockets
+ - Configurable metadata (level, date, time, pid, tid, etc.)
+ - JSON serialization support
+ - Optional colored output
+ - Thread-safe logging
+
+Initial implementation based on Oak: https://github.com/San7o/oak
+
+
+Usage
+-----
+
+Do this:
+
+  #define MICRO_LOG_IMPLEMENTATION
+
+before you include the header in *one* C or C++ file to create the
+implementation.
+
+i.e. it should look like this:
+
+  #include ...
+  #include ...
+  #include ...
+  #define MICRO_LOG_IMPLEMENTATION
+  #include "micro-log.h"
+
+You can tune the library by #defining certain values. See the
+"Config" comments under the "Configuration" section in the header.
+
+!!IMPORTANT: READ THIS FOR MULTITHREADING !!
+Multithreading support is optional as it adds a small performance
+setback since printing must be regulated via a mutex.  If you want
+to support logging from multiple threads, then define
+MICRO_LOG_MULTITHREADED before including this file.
+
+(Almost) All function have two versions: one that interacts with a
+global logger, and another that uses a logger instance you
+supply. This is needed because most of the time you just want a
+global logger without the need to pass references to loggers, but
+you may also need different loggers for different parts of your
+application, hence both options are provided.
+
+We will see some examples with the global logger. To use a local
+one, you just need to add a '2' after functions, for example
+`micro_log_error` becomes `micro_log_error2`.
+
+After including the library, you can initialize a logger with
+`micro_log_init`. You can pass some flags that tells the logger to
+write additional metadata to the output, for example:
+
+```
+micro_log_init(MICRO_LOG_FLAG_LEVEL 
+               | MICRO_LOG_FLAG_DATE  
+               | MICRO_LOG_FLAG_TIME);
+```
+
+If using `micro_log_init2`, the function will return a new logger.
+
+Remember to close the logger after you are done with
+`micro_log_close();`.
+
+You can set additional settings like the log level with
+`micro_log_set_level` or a file with `micro_log_set_file`, check
+out the function declarations.
+
+To log something, use the macro `micro_log_` with the level you
+want to use, like:
+
+```
+micro_log_info("I’d like to interject for a moment. %s", text);
+```
+
+You can format the logs like printf(3).
+
+Check out more examples at the end of the header.
+
+
+TODO
+----
+
+- refactor code
+- read settings from file
+- log to socket (UNIX)
+- windows support
