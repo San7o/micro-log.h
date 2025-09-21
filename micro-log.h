@@ -531,7 +531,7 @@ void _micro_log_write_impl(MicroLog *micro_log,
 #define __VPRINTF_SOCKET(...) assert(false); // TODO
 #else
 #define __PRINTF_SOCKET(...) ;
-#define __VPRINTF_SOCKET(...) ;
+#define __VPRINTF_SOCKET(fmt, args) ;
 #endif
 #define __PRINTF(...)                                   \
   do {                                                  \
@@ -543,15 +543,22 @@ void _micro_log_write_impl(MicroLog *micro_log,
       fprintf(micro_log->file, __VA_ARGS__);            \
     __PRINTF_SOCKET(__VA_ARGS__);                       \
   } while(0)
-#define __VPRINTF(...)                                   \
+#define __VPRINTF(fmt, args)                             \
   do {                                                   \
     if (micro_log->out_bitfield & MICRO_LOG_OUT_STDOUT)  \
-      vfprintf(stdout, __VA_ARGS__);                     \
+    {                                                    \
+      va_list copy; va_copy(copy, args);                 \
+      vfprintf(stdout, fmt, copy);                       \
+      va_end(copy);                                      \
+    }                                                    \
     if (micro_log->out_bitfield & MICRO_LOG_OUT_FILE)    \
-      vfprintf(micro_log->file, __VA_ARGS__);            \
+    {                                                    \
+      va_list copy; va_copy(copy, args);                 \
+      vfprintf(micro_log->file, fmt, copy);              \
+      va_end(copy);                                      \
+    }                                                    \
     if (micro_log->out_bitfield & MICRO_LOG_OUT_SOCKET)  \
-      vfprintf(micro_log->file, __VA_ARGS__);            \
-    __VPRINTF_SOCKET(__VA_ARGS__);                       \
+      __VPRINTF_SOCKET(fmt, args);                       \
   } while(0)
 
   
