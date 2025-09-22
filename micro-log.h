@@ -181,7 +181,9 @@ extern "C" {
 #define MICRO_LOG_ERROR_SOCK_PATH_NULL    22
 #define MICRO_LOG_ERROR_OPEN_UNIX_SOCK    23
 #define MICRO_LOG_ERROR_UNIX_CONNECT      24
-#define _MICRO_LOG_ERROR_MAX              25
+#define MICRO_LOG_ERROR_FLUSH_STDOUT      25
+#define MICRO_LOG_ERROR_FLUSH_FILE        26
+#define _MICRO_LOG_ERROR_MAX              27
   
 //
 // Macros
@@ -579,13 +581,24 @@ micro_log_error micro_log_flush2(MicroLog *micro_log)
 
   if (micro_log->out_bitfield & MICRO_LOG_OUT_STDOUT)
   {
-    fflush(stdout);
+    if (fflush(stdout) != 0)
+    {
+      perror("Error flushing stdout");
+      error = MICRO_LOG_ERROR_FLUSH_STDOUT;
+      goto done;
+    }
   }
   if (micro_log->out_bitfield & MICRO_LOG_OUT_FILE)
   {
-    fflush(micro_log->file);
+    if (fflush(micro_log->file) != 0)
+    {
+      perror("Error flushing file");
+      error = MICRO_LOG_ERROR_FLUSH_FILE;
+      goto done;
+    }
   }
-  
+
+ done:
   return error;
 }
   
