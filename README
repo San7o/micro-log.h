@@ -18,11 +18,12 @@ Features
 --------
 
  - Multiple logging levels
- - Log to stdout, files, UNIX sockets, or network sockets
+ - Log to stdout, files, UNIX sockets, and network sockets
  - Configurable metadata (level, date, time, pid, tid, etc.)
  - JSON serialization support
  - Optional colored output
  - Thread-safe logging
+ - optional colored output
 
 Initial implementation based on Oak: https://github.com/San7o/oak
 
@@ -99,7 +100,5 @@ Check out more examples at the end of the header.
 TODO
 ----
 
-- refactor code
 - read settings from file
-- log to socket (UNIX)
 - windows support
