@@ -8,7 +8,7 @@
 
 int main(void)
 {
-  assert(micro_log_init(MICRO_LOG_FLAG_TIME) == MICRO_LOG_OK);
+  assert(micro_log_init() == MICRO_LOG_OK);
 
   assert(micro_log_set_socket_inet("127.0.0.1", 5000, MICRO_LOG_PROTO_TCP) == MICRO_LOG_OK);
 

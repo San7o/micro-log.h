@@ -6,6 +6,12 @@
 //
 // Header-only, configurable, thread safe logging framework in C99.
 //
+// ```
+// 2025-09-21 22:32:36 INFO   | Logger initialized
+// 2025-09-21 22:32:36 INFO   | I’d just like to interject for a moment...
+// 2025-09-21 22:32:36 INFO   | Closing logger
+// ```
+//
 // Author:  Giovanni Santini
 // Mail:    giovanni.santini@proton.me
 // License: MIT
@@ -19,6 +25,7 @@
 //  - Configurable metadata (level, date, time, pid, tid, etc.)
 //  - JSON serialization support
 //  - Thread-safe logging
+//  - read settings from file (see the file `settings`)
 //  - optional colored output
 //
 // Initial implementation based on Oak: https://github.com/San7o/oak
@@ -65,19 +72,16 @@
 // ...)`.
 //
 // After including the library, you can initialize a logger with
-// `micro_log_init`. You can pass some flags that tells the logger to
-// write additional metadata to the output, for example:
+// `micro_log_init`.
 //
 // ```
-// micro_log_init(MICRO_LOG_FLAG_LEVEL 
-//                | MICRO_LOG_FLAG_DATE  
-//                | MICRO_LOG_FLAG_TIME);
+// micro_log_init();
 // ```
 //
-// If using `micro_log_init2`, the function will return a new logger.
+// If using `micro_log_init2`, you can specify a pointer to a logger.
 //
 // Remember to close the logger after you are done with
-// `micro_log_close();`.
+// `micro_log_close()`.
 //
 // You can set additional settings like the log level with
 // `micro_log_set_level` or a file with `micro_log_set_file`, check
@@ -94,11 +98,12 @@
 //
 // Check out more examples at the end of the header.
 //
+// You can also read some settings from a file. Check out the file
+// `settings` for additional information.
 //
 // TODO
 // ----
 //
-// - read settings from file
 // - windows support
 //
 
@@ -136,9 +141,9 @@ extern "C" {
     #include <ws2tcpip.h>
     #define close_socket(s) closesocket(s)
     #pragma comment(lib, "ws2_32.lib")  // link against Winsock library
-    #error "I don't even pretend this may work on windows, so TODO"
     #define dprintf(...) assert(false); // TODO
     #define vdprintf(...) assert(false); // TODO
+    #error "TODO Support for windows internet sockets"
   #else
     // POSIX (Linux, macOS, BSD, etc.)
     #include <sys/types.h>
@@ -157,34 +162,41 @@ extern "C" {
 
 // Do not expect the error numbers to be the same in the future, use
 // the macro
-#define MICRO_LOG_OK                      0
-#define MICRO_LOG_ERROR_LOGGER_NULL       1
-#define MICRO_LOG_ERROR_UNIMPLEMENTED     2
-#define MICRO_LOG_ERROR_MUTEX_LOCK        3
-#define MICRO_LOG_ERROR_MUTEX_UNLOCK      4
-#define MICRO_LOG_ERROR_CLOSE_FILE        5
-#define MICRO_LOG_ERROR_CLOSE_INET_SOCK   6
-#define MICRO_LOG_ERROR_CLOSE_UNIX_SOCK   7
-#define MICRO_LOG_ERROR_OPEN_FILE         8
-#define MICRO_LOG_ERROR_INET_ADDR_NULL    9
-#define MICRO_LOG_ERROR_OPEN_INET_SOCK    10
-#define MICRO_LOG_ERROR_INET_CONNECT      11
-#define MICRO_LOG_ERROR_PRINTF_SOCK_INET  12
-#define MICRO_LOG_ERROR_VPRINTF_SOCK_INET 13
-#define MICRO_LOG_ERROR_PRINTF_SOCK_UNIX  14
-#define MICRO_LOG_ERROR_VPRINTF_SOCK_UNIX 15
-#define MICRO_LOG_ERROR_PRINTF_STDOUT     16
-#define MICRO_LOG_ERROR_PRINTF_FILE       17
-#define MICRO_LOG_ERROR_VPRINTF_STDOUT    18
-#define MICRO_LOG_ERROR_VPRINTF_FILE      19
-#define MICRO_LOG_ERROR_INET_ADDR         21
-#define MICRO_LOG_ERROR_SOCK_PATH_NULL    22
-#define MICRO_LOG_ERROR_OPEN_UNIX_SOCK    23
-#define MICRO_LOG_ERROR_UNIX_CONNECT      24
-#define MICRO_LOG_ERROR_FLUSH_STDOUT      25
-#define MICRO_LOG_ERROR_FLUSH_FILE        26
-#define _MICRO_LOG_ERROR_MAX              27
-  
+#define MICRO_LOG_OK                         0
+#define MICRO_LOG_ERROR_LOGGER_NULL          1
+#define MICRO_LOG_ERROR_UNIMPLEMENTED        2
+#define MICRO_LOG_ERROR_MUTEX_LOCK           3
+#define MICRO_LOG_ERROR_MUTEX_UNLOCK         4
+#define MICRO_LOG_ERROR_CLOSE_FILE           5
+#define MICRO_LOG_ERROR_CLOSE_INET_SOCK      6
+#define MICRO_LOG_ERROR_CLOSE_UNIX_SOCK      7
+#define MICRO_LOG_ERROR_OPEN_FILE            8
+#define MICRO_LOG_ERROR_INET_ADDR_NULL       9
+#define MICRO_LOG_ERROR_OPEN_INET_SOCK       10
+#define MICRO_LOG_ERROR_INET_CONNECT         11
+#define MICRO_LOG_ERROR_PRINTF_SOCK_INET     12
+#define MICRO_LOG_ERROR_VPRINTF_SOCK_INET    13
+#define MICRO_LOG_ERROR_PRINTF_SOCK_UNIX     14
+#define MICRO_LOG_ERROR_VPRINTF_SOCK_UNIX    15
+#define MICRO_LOG_ERROR_PRINTF_STDOUT        16
+#define MICRO_LOG_ERROR_PRINTF_FILE          17
+#define MICRO_LOG_ERROR_VPRINTF_STDOUT       18
+#define MICRO_LOG_ERROR_VPRINTF_FILE         19
+#define MICRO_LOG_ERROR_INET_ADDR            21
+#define MICRO_LOG_ERROR_SOCK_PATH_NULL       22
+#define MICRO_LOG_ERROR_OPEN_UNIX_SOCK       23
+#define MICRO_LOG_ERROR_UNIX_CONNECT         24
+#define MICRO_LOG_ERROR_FLUSH_STDOUT         25
+#define MICRO_LOG_ERROR_FLUSH_FILE           26
+#define MICRO_LOG_ERROR_FROM_FILE_NULL       27
+#define MICRO_LOG_ERROR_INVALID_FILE_SETTING 28
+#define MICRO_LOG_ERROR_UNKNOWN_LEVEL        29
+#define MICRO_LOG_ERROR_UNKNOWN_FLAG         30
+#define MICRO_LOG_ERROR_INVALID_INET_ADDR    31
+#define MICRO_LOG_ERROR_INVALID_PORT         32
+#define MICRO_LOG_ERROR_INVALID_PROTOCOL     33
+#define _MICRO_LOG_ERROR_MAX                 34
+
 //
 // Macros
 //
@@ -198,6 +210,7 @@ extern "C" {
 #include <pthread.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define MICRO_LOG_FLAG_NONE  (0)
 #define MICRO_LOG_FLAG_LEVEL (1 << 0)
@@ -260,26 +273,26 @@ extern "C" {
 #define micro_log_write2(micro_log, log_level, ...)                     \
   _micro_log_write_impl(micro_log, log_level, __FILE__, __LINE__, __VA_ARGS__)
 
-#define micro_log_trace2(micro_log, ...)                                \
-  micro_log_local_write(micro_log, MICRO_LOG_LEVEL_TRACE, __VA_ARGS__)
+#define micro_log_trace2(micro_log, ...)                          \
+  micro_log_write2(micro_log, MICRO_LOG_LEVEL_TRACE, __VA_ARGS__)
 
-#define micro_log_debug2(micro_log, ...)                                \
-  micro_log_local_write(micro_log, MICRO_LOG_LEVEL_DEBUG, __VA_ARGS__)
+#define micro_log_debug2(micro_log, ...)                          \
+  micro_log_write2(micro_log, MICRO_LOG_LEVEL_DEBUG, __VA_ARGS__)
 
-#define micro_log_info2(micro_log, ...)                               \
-  micro_log_local_write(micro_log, MICRO_LOG_LEVEL_INFO, __VA_ARGS__)
+#define micro_log_info2(micro_log, ...)                           \
+  micro_log_write2(micro_log, MICRO_LOG_LEVEL_INFO, __VA_ARGS__)
 
-#define micro_log_warn2(micro_log, ...)                               \
-  micro_log_local_write(micro_log, MICRO_LOG_LEVEL_WARN, __VA_ARGS__)
+#define micro_log_warn2(micro_log, ...)                           \
+  micro_log_write2(micro_log, MICRO_LOG_LEVEL_WARN, __VA_ARGS__)
 
-#define micro_log_error2(micro_log, ...)                                \
-  micro_log_local_write(micro_log, MICRO_LOG_LEVEL_ERROR, __VA_ARGS__)
+#define micro_log_error2(micro_log, ...)                          \
+  micro_log_write2(micro_log, MICRO_LOG_LEVEL_ERROR, __VA_ARGS__)
 
-#define micro_log_fatal2(micro_log, ...)                                \
-  micro_log_local_write(micro_log, MICRO_LOG_LEVEL_FATAL, __VA_ARGS__)
+#define micro_log_fatal2(micro_log, ...)                          \
+  micro_log_write2(micro_log, MICRO_LOG_LEVEL_FATAL, __VA_ARGS__)
 
 //
-// Types
+// Types and functions
 //
 
 enum MicroLogLevel {
@@ -333,35 +346,99 @@ typedef struct {
 } MicroLog;
 
 //
-// Declarations
-//
-
-// Global logger
-extern MicroLog micro_log_global;
-
 // Global logger functions
+//
+//
+// The Global logger
+//
+// This is a global logger that can be used with the function below.
+// You can also create other loggers, check out the other functions
+// in the `Local logger functions` group.
+extern MicroLog micro_log_global;
+  
+// Initialize the global logger
+//
+// Notes: remember to close it when you are done
+micro_log_error micro_log_init(void);
 
-micro_log_error micro_log_init(long unsigned int flags_bitfield);
+// Read settings from file
+//
+// Check out the file named `settings` for additional information
+// Notes: this expects the global logger to be already initialzied
+micro_log_error micro_log_from_file(char *filename);
+
+// Close the global logger
 micro_log_error micro_log_close(void);
+
+// Flush all current output streams in the global logger
 micro_log_error micro_log_flush(void);
+
+// Set output flags to global logger
+//
+// These are additional information to the log output, such as the
+// date, line, file position etc. You can also set the output to be
+// colored or to be serialized in some format like json.
+//
+// Check out the MICRO_LOG_FLAG_ values to see all the flags available
 micro_log_error micro_log_set_flags(long unsigned int flags_bitfield);
+
+// Set the log level to global logger
+//
+// Only the logs with an higher level of the current log level will be
+// printed.
+//
+// Check out the MicroLogLevel enum for a list of the supported levels.
 micro_log_error micro_log_set_level(enum MicroLogLevel level);
+
+// Set the output streams to the global logger
+//
+// You can toggle some output streams. Check out the MICRO_LOG_OUT_
+// values. Remember that if you manually enable the
+// MICRO_LOG_OUT_FILE, the logger will try to write to a file so you
+// should have already opened it with `miro_log_set_file`. Likewise
+// for the other options. By default, when you add a new output
+// stream, this will be automatically registered.
 micro_log_error micro_log_set_out(int out_flags);
+
+// Set output file of the global logger
+//
+// The logger will write logs to [filename]. The logger will create
+// the file if it does not exist.
 micro_log_error micro_log_set_file(char* filename);
+
 #ifdef MICRO_LOG_SOCKETS
+
+// Set output internet socket of the global logger
+//
+// Note: You need to have defined MICRO_LOG_SOCKETS before including
+// this header in torder to use this function
 micro_log_error
 micro_log_set_socket_inet(char* addr,
                           int port,
                           enum MicroLogProto protocol);
+
 #if defined(__unix__) || defined(__unix)
+
+// Set output unix socket of the global logger
+//
+// Note: You need to have defined MICRO_LOG_SOCKETS before including
+// this header, and be in an unix system to use this function.
 micro_log_error micro_log_set_socket_unix(char* path);
+
 #endif // __unix__
+
 #endif // MICRO_LOG_SOCKETS
 
+//
 // Local logger functions
+//
+// These are equivalent to the global ones but they take an additional
+// MicroLog first argument, which is the logger what will be modified.
 
-micro_log_error micro_log_init2(MicroLog *micro_log,
-                                long unsigned int flags_bitfield);
+micro_log_error micro_log_init2(MicroLog *micro_log);
+// micro_log_from_file2 expects [micro_log] to be already initialzied
+micro_log_error
+micro_log_from_file2(MicroLog *micro_log, char *filename);
 micro_log_error micro_log_close2(MicroLog *micro_log);
 micro_log_error micro_log_flush2(MicroLog *micro_log);
 micro_log_error micro_log_set_flags2(MicroLog *micro_log,
@@ -387,19 +464,26 @@ micro_log_set_socket_unix2(MicroLog *micro_log,
 
 // Misc
 
-const char* micro_log_level_string(enum MicroLogLevel level, bool color);
+// Get a string of a certain log level, with an optional color
+const char*
+micro_log_level_string(enum MicroLogLevel level, bool color);
 
 // The central log function
+//
+// All other functions call this one for printing. It handles all the
+// flags and calls `_micro_log_print_outputs`.
 micro_log_error
 _micro_log_write_impl(MicroLog *micro_log,
                       enum MicroLogLevel level,
                       const char* file,
                       int line,
                       const char *fmt, ...);
-// Print formatted string in multiple outputs
+
+// Wraps `_micro_log_print_outputs_args`
 micro_log_error _micro_log_print_outputs(MicroLog *micro_log,
                                          const char* fmt, ...);
 
+// Print formatted string in multiple outputs.
 micro_log_error
 _micro_log_print_outputs_args(MicroLog *micro_log,
                               const char* fmt,
@@ -438,9 +522,14 @@ _micro_log_print_outputs_args(MicroLog *micro_log,
 
 MicroLog micro_log_global;
 
-micro_log_error micro_log_init(long unsigned int flags_bitfield)
+micro_log_error micro_log_init(void)
 {
-  return micro_log_init2(&micro_log_global, flags_bitfield);
+  return micro_log_init2(&micro_log_global);
+}
+
+micro_log_error micro_log_from_file(char *filename)
+{
+  return micro_log_from_file2(&micro_log_global, filename);
 }
 
 micro_log_error micro_log_close(void)
@@ -491,14 +580,14 @@ micro_log_error micro_log_set_socket_unix(char* path)
 
 #endif // MICRO_LOG_SOCKETS
 
-micro_log_error micro_log_init2(MicroLog *micro_log, long unsigned int flags_bitfield)
+micro_log_error micro_log_init2(MicroLog *micro_log)
 {
   if (micro_log == NULL)
     return MICRO_LOG_ERROR_LOGGER_NULL;
-  
+
   *micro_log = (MicroLog){
     .log_level = MICRO_LOG_LEVEL_TRACE,
-    .flags_bitfield = flags_bitfield,
+    .flags_bitfield = 0,
     .out_bitfield = MICRO_LOG_OUT_STDOUT,
     .file = NULL,
     #ifdef MICRO_LOG_SOCKETS
@@ -517,6 +606,287 @@ micro_log_error micro_log_init2(MicroLog *micro_log, long unsigned int flags_bit
   return MICRO_LOG_OK;
 }
 
+int _micro_log_get_spaces(char* str, int max)
+{
+  int spaces = 0;
+  while((*(str + spaces) == ' ' || *(str + spaces) == '\t') && spaces < max)
+    spaces++;
+  return spaces;
+}
+
+int _micro_log_get_word_len(char* str, int max)
+{
+  int letters = 0;
+  while(*(str+letters) != ' '
+        && *(str+letters) != '\n'
+        && *(str+letters) != '\t'
+        && letters < max)
+    letters++;
+  return letters;
+}
+
+micro_log_error
+micro_log_from_file2(MicroLog *micro_log, char *filename)
+{
+  if (micro_log == NULL)
+    return MICRO_LOG_ERROR_LOGGER_NULL;
+  if (filename == NULL)
+    return MICRO_LOG_ERROR_FROM_FILE_NULL;
+
+  micro_log_error error = MICRO_LOG_OK;
+  
+  FILE* file = fopen(filename, "r");
+  if (file == NULL)
+  {
+    perror("Error opening file");
+    error = MICRO_LOG_ERROR_OPEN_FILE;
+    goto done;
+  }
+
+  // Example file:
+  //
+  // level: debug
+  // flags: level date time tid pid
+  // file: output.txt
+  // inet: 127.0.0.1 5000 TCP
+  // unix: /tmp/a-socket
+  // # A comment
+  //
+  char *line = NULL;
+  size_t len;
+  int spaces;
+  while(getline(&line, &len, file) >= 0)
+  {
+    if (strncmp(line, "#", 1) == 0)
+    {
+      goto next;
+    }
+    if (strncmp(line, "\n", 1) == 0)
+    {
+      goto next;
+    }
+    if (strncmp(line, "level:", 6) == 0)
+    {
+      spaces = _micro_log_get_spaces(line + 6, len - 6);
+      
+      if (strncmp(line + 6 + spaces, "trace", 5) == 0)
+      {
+        micro_log_set_level2(micro_log, MICRO_LOG_LEVEL_TRACE);
+      }
+      else if (strncmp(line + 6 + spaces, "debug", 5) == 0)
+      {
+        micro_log_set_level2(micro_log, MICRO_LOG_LEVEL_DEBUG);
+      }
+      else if (strncmp(line + 6 + spaces, "info", 4) == 0)
+      {
+        micro_log_set_level2(micro_log, MICRO_LOG_LEVEL_INFO);
+      }
+      else if (strncmp(line + 6 + spaces, "warn", 4) == 0)
+      {
+        micro_log_set_level2(micro_log, MICRO_LOG_LEVEL_WARN);
+      }
+      else if (strncmp(line + 6 + spaces, "error", 5) == 0)
+      {
+        micro_log_set_level2(micro_log, MICRO_LOG_LEVEL_ERROR);
+      }
+      else if (strncmp(line + 6 + spaces, "fatal", 5) == 0)
+      {
+        micro_log_set_level2(micro_log, MICRO_LOG_LEVEL_FATAL);
+      }
+      else if (strncmp(line + 6 + spaces, "disabled", 8) == 0)
+      {
+        micro_log_set_level2(micro_log, MICRO_LOG_LEVEL_DISABLED);
+      } else {
+        error = MICRO_LOG_ERROR_UNKNOWN_LEVEL;
+        free(line);
+        goto done;
+      }
+    }
+    else if (strncmp(line, "flags:", 6) == 0)
+    {
+      int pos = 6;
+      long unsigned int flags = 0;
+      pos += _micro_log_get_spaces(line + 6, len - 6);
+      while (pos <= len)
+      {
+        if (strncmp(line + pos, "level", 5) == 0)
+        {
+          flags |= MICRO_LOG_FLAG_LEVEL;
+          pos += 5;
+        }
+        else if (strncmp(line + pos, "date", 4) == 0)
+        {
+          flags |= MICRO_LOG_FLAG_DATE;
+          pos += 4;
+        }
+        else if (strncmp(line + pos, "time", 4) == 0)
+        {
+          flags |= MICRO_LOG_FLAG_TIME;
+          pos += 4;
+        }
+        else if (strncmp(line + pos, "pid", 3) == 0)
+        {
+          flags |= MICRO_LOG_FLAG_PID;
+          pos += 3;
+        }
+        else if (strncmp(line + pos, "tid", 3) == 0)
+        {
+          flags |= MICRO_LOG_FLAG_TID;
+          pos += 3;
+        }
+        else if (strncmp(line + pos, "json", 4) == 0)
+        {
+          flags |= MICRO_LOG_FLAG_JSON;
+          pos += 4;
+        }
+        else if (strncmp(line + pos, "color", 5) == 0)
+        {
+          flags |= MICRO_LOG_FLAG_COLOR;
+          pos += 5;
+        }
+        else if (strncmp(line + pos, "file", 4) == 0)
+        {
+          flags |= MICRO_LOG_FLAG_FILE;
+          pos += 4;
+        }
+        else if (strncmp(line + pos, "line", 4) == 0)
+        {
+          flags |= MICRO_LOG_FLAG_LINE;
+          pos += 4;
+        }
+        else {
+          error = MICRO_LOG_ERROR_UNKNOWN_FLAG;
+          free(line);
+          goto done;
+        }
+
+        if (*(line + pos) == '\n') break;
+        pos += _micro_log_get_spaces(line + pos, len - pos);
+      }
+      error = micro_log_set_flags2(micro_log, flags);
+      if (error != MICRO_LOG_OK) { free(line); goto done; }
+    }
+    else if (strncmp(line, "file:", 5) == 0)
+    {
+      int pos = 5;
+      pos += _micro_log_get_spaces(line + pos, len - 6);
+      int file_str_len = _micro_log_get_word_len(line + pos, len - pos);
+      if (pos + file_str_len < len)
+      {
+        line[pos + file_str_len] = '\0';
+      }
+      
+      error = micro_log_set_file2(micro_log, line + pos);
+      if (error != MICRO_LOG_OK) { free(line); goto done; }
+    }
+    #ifdef MICRO_LOG_SOCKETS
+    else if (strncmp(line, "inet:", 5) == 0)
+    {
+      char* addr;
+      int port;
+      enum MicroLogProto proto;
+      
+      int pos = 6;
+      pos += _micro_log_get_spaces(line + 6, len - 6);
+      int addr_len = _micro_log_get_word_len(line + pos, len - pos);
+      if (addr_len == 0)
+      {
+        error = MICRO_LOG_ERROR_INVALID_INET_ADDR;
+        free(line);
+        goto done;
+      }
+
+      addr = malloc(addr_len + 1);
+      strncpy(addr, line + pos, addr_len);
+      addr[addr_len] = '\0';
+      
+      pos += addr_len;
+
+      pos += _micro_log_get_spaces(line + pos, len - pos);
+      int port_len = _micro_log_get_word_len(line + pos, len - pos);
+      if (port_len == 0)
+      {
+        error = MICRO_LOG_ERROR_INVALID_PORT;
+        free(line); free(addr);
+        goto done;
+      }
+
+      char *port_str = malloc(port_len + 1);
+      strncpy(port_str, line + pos, port_len);
+      port_str[port_len] = '\0';
+
+      port = atoi(port_str);
+      if (port_len == 0)
+      {
+        error = MICRO_LOG_ERROR_INVALID_PORT;
+        free(port_str); free(line); free(addr);
+        goto done;
+      }
+      
+      free(port_str);
+      pos += port_len;
+
+      pos += _micro_log_get_spaces(line + pos, len - pos);
+      int proto_len = _micro_log_get_word_len(line + pos, len - pos);
+      if (proto_len == 0)
+      {
+        error = MICRO_LOG_ERROR_INVALID_PROTOCOL;
+        free(line); free(addr);
+        goto done;
+      }
+
+      if (strncmp(line + pos, "tcp", 3) == 0)
+      {
+        proto = MICRO_LOG_PROTO_TCP;
+      }
+      else if (strncmp(line + pos, "udp", 3) == 0)
+      {
+        proto = MICRO_LOG_PROTO_UDP;
+      }
+      else {
+        error = MICRO_LOG_ERROR_INVALID_PROTOCOL;
+        free(line); free(addr);
+        goto done;
+      }
+      
+      error = micro_log_set_socket_inet(addr, port, proto);
+      if (error != MICRO_LOG_OK) { free(line); free(addr); goto done; }
+      
+      free(addr);
+    }
+    #if defined(__unix__) || defined(__unix)
+    else if (strncmp(line, "unix:", 5) == 0)
+    {
+      spaces = _micro_log_get_spaces(line + 5, len - 6);
+      error = micro_log_set_socket_unix2(micro_log, line + 5 + spaces);
+      if (error != MICRO_LOG_OK) { free(line); goto done; }
+    }
+    #endif // __unix__
+    #endif // MICRO_LOG_SOCKETS
+    else {
+      free(line);
+      error = MICRO_LOG_ERROR_INVALID_FILE_SETTING;
+      goto done;
+    }
+
+    next:
+    free(line);
+    line = NULL;
+  }
+  
+  if (fclose(file) != 0)
+  {
+    error = MICRO_LOG_ERROR_CLOSE_FILE;
+    goto done;
+  }
+  
+ done:
+
+  if (error == MICRO_LOG_OK)
+    micro_log_trace("Initialized logger from file \"%s\"", filename);
+  return error;
+}
+
 micro_log_error micro_log_close2(MicroLog *micro_log)
 {
   if (micro_log == NULL)
@@ -524,7 +894,7 @@ micro_log_error micro_log_close2(MicroLog *micro_log)
 
   micro_log_error error = MICRO_LOG_OK;
 
-  micro_log_write2(micro_log, MICRO_LOG_LEVEL_INFO, "Closing logger");
+  micro_log_info2(micro_log, "Closing logger");
   
   __MICRO_LOG_LOCK(micro_log);
   
@@ -628,6 +998,9 @@ micro_log_set_level2(MicroLog *micro_log,
   if (micro_log == NULL)
     return MICRO_LOG_ERROR_LOGGER_NULL;
 
+  if (level > _MICRO_LOG_LEVEL_MAX)
+    return MICRO_LOG_ERROR_UNKNOWN_LEVEL;
+  
   micro_log_error error = MICRO_LOG_OK;
 
   __MICRO_LOG_LOCK(micro_log);
@@ -637,6 +1010,10 @@ micro_log_set_level2(MicroLog *micro_log,
   goto done;
  done:
   __MICRO_LOG_UNLOCK(micro_log);
+
+  if (error == MICRO_LOG_OK)
+    micro_log_trace2(micro_log, "Set log level to %s",
+                     micro_log_level_string(level, false));
   return error;
 }
 
@@ -690,6 +1067,9 @@ micro_log_error micro_log_set_file2(MicroLog *micro_log,
 
  done:
   __MICRO_LOG_UNLOCK(micro_log);
+
+  if (error == MICRO_LOG_OK)
+    micro_log_trace("Set output file to \"%s\"", filename);
   return error;
 }
 
@@ -764,6 +1144,11 @@ micro_log_set_socket_inet2(MicroLog *micro_log,
   
  done:
   __MICRO_LOG_UNLOCK(micro_log);
+
+  if (error == MICRO_LOG_OK)
+    micro_log_trace2(micro_log,
+                     "Set output to inet socket at address \"%s\" port %d",
+                     addr, port);
   return error;
 }
 
@@ -815,6 +1200,10 @@ micro_log_set_socket_unix2(MicroLog* micro_log, char* path)
 
  done:
   __MICRO_LOG_UNLOCK(micro_log);
+
+  if (error == MICRO_LOG_OK)
+    micro_log_trace2(micro_log,
+                     "Set output to unix socket \"%s\"", path);
   return error;
 }
 #endif // __unix__
@@ -1049,7 +1438,9 @@ _micro_log_write_impl(MicroLog *micro_log,
   {
     error = _micro_log_print_outputs(micro_log, "\"log\": \"");
     CHECK_ERROR();
-  } else if (micro_log->flags_bitfield > 1) {
+  }
+  else if (micro_log->flags_bitfield > 1)
+  {
     error = _micro_log_print_outputs(micro_log, COLOR2("| "));
     CHECK_ERROR();
   }
@@ -1173,10 +1564,10 @@ _micro_log_print_outputs_args(MicroLog *micro_log,
 
 int main(void)
 {
-  micro_log_init(MICRO_LOG_FLAG_LEVEL 
-                 | MICRO_LOG_FLAG_DATE  
-                 | MICRO_LOG_FLAG_TIME);
-
+  micro_log_init();
+  micro_log_set_flags(MICRO_LOG_FLAG_LEVEL 
+                      | MICRO_LOG_FLAG_DATE  
+                      | MICRO_LOG_FLAG_TIME)
   micro_log_set_file("out");
   
   micro_log_info("I’d just like to interject for a moment...");

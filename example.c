@@ -9,20 +9,17 @@
 
 int main(void)
 {
-  assert(micro_log_init(MICRO_LOG_FLAG_LEVEL 
-                 | MICRO_LOG_FLAG_DATE  
-                 | MICRO_LOG_FLAG_TIME  
-                 | MICRO_LOG_FLAG_PID   
-                 | MICRO_LOG_FLAG_TID   
-                 // | MICRO_LOG_FLAG_JSON  
-                 // | MICRO_LOG_FLAG_COLOR 
-                 | MICRO_LOG_FLAG_FILE  
-                 | MICRO_LOG_FLAG_LINE) == MICRO_LOG_OK);
-
-  assert(micro_log_set_file("out") == MICRO_LOG_OK);
-
+  // Sample data
   int x = 69;
   const char * say_it = "WORKS";
+
+  assert(micro_log_init() == MICRO_LOG_OK);
+
+  // Read settings from file
+  //
+  // Please see the example file named `settings` for additional
+  // information
+  assert(micro_log_from_file("settings") == MICRO_LOG_OK);
   
   assert(micro_log_trace("x = %d", x) == MICRO_LOG_OK);
   assert(micro_log_debug("IT, JUST, %s", say_it) == MICRO_LOG_OK);

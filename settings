@@ -1,0 +1,30 @@
+# micro log settings file
+# -----------------------
+#
+# The logger can load this file dynamically and use these settings
+# via the `micro_log_from_file` and `micro_log_from_file2` functions
+
+# Specify the log level
+#
+# Only logs that are above this level will be printed.
+# Options are: trace, debug, info, warn, error, fatal, disabled
+level: debug
+
+# Specify output flags
+#
+# These are additional information to the log output, separated by a
+# space.
+# Options are: level, date, time, pid, tid, json, color, file, line
+flags: level date time
+
+# Specify the output file
+file: out
+
+# Specify a network socket
+#
+# IPv4 PORT PROTOCOL
+# Protocol can be either tcp or udp
+# inet: 127.0.0.1 5000 tcp
+
+# Specify a unix socket
+# unix: /tmp/my-unix-socket

@@ -18,11 +18,11 @@ Features
 --------
 
  - Multiple logging levels
- - Log to stdout, files, UNIX sockets, and network sockets
+ - Log to stdout, file, UNIX sockets, and network sockets
  - Configurable metadata (level, date, time, pid, tid, etc.)
  - JSON serialization support
- - Optional colored output
  - Thread-safe logging
+ - read settings from file (see the file `settings`)
  - optional colored output
 
 Initial implementation based on Oak: https://github.com/San7o/oak
@@ -35,7 +35,7 @@ Do this:
 
   #define MICRO_LOG_IMPLEMENTATION
 
-before you include the header in *one* C or C++ file to create the
+before you include this file in *one* C or C++ file to create the
 implementation.
 
 i.e. it should look like this:
@@ -53,7 +53,7 @@ You can tune the library by #defining certain values. See the
 Multithreading support is optional as it adds a small performance
 setback since printing must be regulated via a mutex.  If you want
 to support logging from multiple threads, then define
-MICRO_LOG_MULTITHREADED before including this file.
+MICRO_LOG_MULTITHREADED before including the header file.
 
 (Almost) All function have two versions: one that interacts with a
 global logger, and another that uses a logger instance you
@@ -63,23 +63,22 @@ you may also need different loggers for different parts of your
 application, hence both options are provided.
 
 We will see some examples with the global logger. To use a local
-one, you just need to add a '2' after functions, for example
-`micro_log_error` becomes `micro_log_error2`.
+one, you just need to use the version '2' of the functions and pass
+the logger as the first parameter. For example
+`micro_log_info(...)` becomes `micro_log_info2(MicroLog logger,
+...)`.
 
 After including the library, you can initialize a logger with
-`micro_log_init`. You can pass some flags that tells the logger to
-write additional metadata to the output, for example:
+`micro_log_init`.
 
 ```
-micro_log_init(MICRO_LOG_FLAG_LEVEL 
-               | MICRO_LOG_FLAG_DATE  
-               | MICRO_LOG_FLAG_TIME);
+micro_log_init();
 ```
 
-If using `micro_log_init2`, the function will return a new logger.
+If using `micro_log_init2`, you can specify a pointer to a logger.
 
 Remember to close the logger after you are done with
-`micro_log_close();`.
+`micro_log_close()`.
 
 You can set additional settings like the log level with
 `micro_log_set_level` or a file with `micro_log_set_file`, check
@@ -96,9 +95,11 @@ You can format the logs like printf(3).
 
 Check out more examples at the end of the header.
 
+You can also read some settings from a file. Check out the file
+`settings` for additional information.
 
 TODO
 ----
 
-- read settings from file
 - windows support
+

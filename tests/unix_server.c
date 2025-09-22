@@ -15,7 +15,7 @@
 #include <sys/un.h>
 
 #define READ_BUFF_SIZE 1024
-#define UNIX_SOCKET_FILE "my-unix-socket"
+#define UNIX_SOCKET_FILE "/tmp/my-unix-socket"
 
 int main(void)
 {
