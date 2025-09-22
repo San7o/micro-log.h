@@ -216,6 +216,7 @@ extern "C" {
 #define MICRO_LOG_OUT_SOCK_UNIX (1 << 3)
 #endif // __unix__
 #endif // MICRO_LOG_SOCKETS
+#define _MICRO_LOG_OUT_MAX      (1 << 4)
 
 #define MICRO_LOG_RST  "\x1B[0m"
 #define MICRO_LOG_RED(x) "\x1B[31m" x MICRO_LOG_RST
@@ -340,6 +341,7 @@ extern MicroLog micro_log_global;
 
 micro_log_error micro_log_init(long unsigned int flags_bitfield);
 micro_log_error micro_log_close(void);
+micro_log_error micro_log_flush(void);
 micro_log_error micro_log_set_flags(long unsigned int flags_bitfield);
 micro_log_error micro_log_set_level(enum MicroLogLevel level);
 micro_log_error micro_log_set_out(int out_flags);
@@ -359,6 +361,7 @@ micro_log_error micro_log_set_socket_unix(char* path);
 micro_log_error micro_log_init2(MicroLog *micro_log,
                                 long unsigned int flags_bitfield);
 micro_log_error micro_log_close2(MicroLog *micro_log);
+micro_log_error micro_log_flush2(MicroLog *micro_log);
 micro_log_error micro_log_set_flags2(MicroLog *micro_log,
                           long unsigned int flags_bitfield);
 micro_log_error
@@ -441,6 +444,11 @@ micro_log_error micro_log_init(long unsigned int flags_bitfield)
 micro_log_error micro_log_close(void)
 {
   return micro_log_close2(&micro_log_global);
+}
+
+micro_log_error micro_log_flush(void)
+{
+  return micro_log_flush2(&micro_log_global);
 }
 
 micro_log_error micro_log_set_flags(long unsigned int flags_bitfield)
@@ -560,6 +568,27 @@ micro_log_error micro_log_close2(MicroLog *micro_log)
   return error;
 }
 
+_Static_assert(_MICRO_LOG_OUT_MAX == (1 << 4),
+               "Updated MICRO_LOG_OUT_MAX, maybe should also update micro_log_flush2");
+micro_log_error micro_log_flush2(MicroLog *micro_log)
+{
+  if (micro_log == NULL)
+    return MICRO_LOG_ERROR_LOGGER_NULL;
+
+  micro_log_error error = MICRO_LOG_OK;
+
+  if (micro_log->out_bitfield & MICRO_LOG_OUT_STDOUT)
+  {
+    fflush(stdout);
+  }
+  if (micro_log->out_bitfield & MICRO_LOG_OUT_FILE)
+  {
+    fflush(micro_log->file);
+  }
+  
+  return error;
+}
+  
 micro_log_error
 micro_log_set_flags2(MicroLog *micro_log,
                      long unsigned int flags_bitfield)
@@ -1035,7 +1064,7 @@ _micro_log_write_impl(MicroLog *micro_log,
 #undef COLOR
 #undef COLOR2
 }
-  
+
 micro_log_error
 _micro_log_print_outputs(MicroLog *micro_log, const char* fmt, ...)
 {
@@ -1049,6 +1078,8 @@ _micro_log_print_outputs(MicroLog *micro_log, const char* fmt, ...)
   return error;
 }
 
+_Static_assert(_MICRO_LOG_OUT_MAX == (1 << 4),
+               "Updated MICRO_LOG_OUT, should also update _micro_log_print_outputs_args");
 micro_log_error
 _micro_log_print_outputs_args(MicroLog *micro_log,
                               const char* fmt,
