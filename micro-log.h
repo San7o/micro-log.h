@@ -126,35 +126,13 @@ extern "C" {
 // Config: Enable thread safety by defining MICRO_LOG_MULTITHREADED
 // Note: This is optional since it adds a (tiny) performance setback
 // since printing must be regulated via a mutex.
-#ifdef MICRO_LOG_MULTITHREADED
-  #ifdef _WIN32
-    #error "TODO: Multithreading support on windows is not yet supported"
-  #endif
-#endif
+//
+//#define MICRO_LOG_MULTITHREADED
 
 // Config: Enable logging on operating system sockets
 // Note: Optional since this may not be needed by most applications
-#ifdef MICRO_LOG_SOCKETS
-  #ifdef _WIN32
-    // Windows
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #define close_socket(s) closesocket(s)
-    #pragma comment(lib, "ws2_32.lib")  // link against Winsock library
-    #define dprintf(...) assert(false); // TODO
-    #define vdprintf(...) assert(false); // TODO
-    #error "TODO Support for windows internet sockets"
-  #else
-    // POSIX (Linux, macOS, BSD, etc.)
-    #include <sys/types.h>
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #include <sys/un.h>
-    #define close_socket(s) close(s)
-  #endif // _WIN32
-#endif // MICRO_LOG_SOCKETS
+//
+//#define MICRO_LOG_SOCKETS
 
 //
 // Errors
@@ -201,17 +179,17 @@ extern "C" {
 // Macros
 //
 
+#ifdef MICRO_LOG_MULTITHREADED
+  #ifdef _WIN32
+    #error "TODO: Multithreading support on windows is not yet supported"
+  #endif
+  #include <pthread.h>
+#endif
+
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <stdarg.h>
-#define _GNU_SOURCE
-#include <unistd.h>
-#include <time.h>
-#include <pthread.h>
-#include <assert.h>
-#include <string.h>
-#include <stdlib.h>
-
+  
 #define MICRO_LOG_FLAG_NONE  (0)
 #define MICRO_LOG_FLAG_LEVEL (1 << 0)
 #define MICRO_LOG_FLAG_DATE  (1 << 1)
@@ -494,6 +472,37 @@ _micro_log_print_outputs_args(MicroLog *micro_log,
 
 #ifdef MICRO_LOG_IMPLEMENTATION
 
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <time.h>
+#include <pthread.h>
+#include <assert.h>
+#include <string.h>
+#include <stdlib.h>
+
+#ifdef MICRO_LOG_SOCKETS
+  #ifdef _WIN32
+    // Windows
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #define close_socket(s) closesocket(s)
+    #pragma comment(lib, "ws2_32.lib")  // link against Winsock library
+    #define dprintf(...) assert(false); // TODO
+    #define vdprintf(...) assert(false); // TODO
+    #error "TODO Support for windows internet sockets"
+  #else
+    // POSIX (Linux, macOS, BSD, etc.)
+    #include <sys/types.h>
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <unistd.h>
+    #include <sys/un.h>
+    #define close_socket(s) close(s)
+  #endif // _WIN32
+#endif // MICRO_LOG_SOCKETS
+
+  
 #ifdef MICRO_LOG_MULTITHREADED
 
 #define __MICRO_LOG_LOCK(__micro_log_ptr)                   \
