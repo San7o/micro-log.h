@@ -101,6 +101,20 @@
 // You can also read some settings from a file. Check out the file
 // `settings` for additional information.
 //
+//
+// Code
+// ----
+//
+// The official git repository of micro-log.h is hosted at:
+//
+//     https://github.com/San7o/micro-log.h
+//
+// This is part of a bigger collection of header-only C99 libraries
+// called "micro-headers", contributions are welcome:
+//
+//     https://github.com/San7o/micro-headers
+//
+//
 // TODO
 // ----
 //
