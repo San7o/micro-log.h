@@ -131,8 +131,10 @@
 extern "C" {
 #endif
 
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L // dprintf, vdprintf (UNIX)
-
+#endif
+  
 //
 // Configuration
 //
