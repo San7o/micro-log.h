@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+// Author:  Giovanni Santini
+// Mail:    giovanni.santini@proton.me
+// Github:  @San7o
 
 #define MICRO_LOG_IMPLEMENTATION
 #define MICRO_LOG_MULTITHREADED
@@ -7,11 +10,16 @@
 
 #include <stdio.h>
 
+#define MAYBE_UNUSED(x) (void)(x)
+
 int main(void)
 {
   // Sample data
   int x = 69;
   const char * say_it = "WORKS";
+  MAYBE_UNUSED(x);
+  MAYBE_UNUSED(say_it);
+  
 
   assert(micro_log_init() == MICRO_LOG_OK);
 

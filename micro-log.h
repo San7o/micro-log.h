@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 // micro-log.h
-// -----------
+// ===========
 //
 // Header-only, configurable, thread safe logging framework in C99.
 //
@@ -27,8 +27,27 @@
 //  - Thread-safe logging
 //  - read settings from file (see the file `settings`)
 //  - optional colored output
+//  - compile time settings
 //
 // Initial implementation based on Oak: https://github.com/San7o/oak
+//
+// Example
+// -------
+// 
+//    #define MICRO_LOG_IMPLEMENTATION
+//    #include "micro-log.h"
+// 
+//    int main(void)
+//    {
+//       micro_log_init();
+//       micro_log_set_flags(MICRO_LOG_FLAG_LEVEL 
+//                           | MICRO_LOG_FLAG_DATE  
+//                           | MICRO_LOG_FLAG_TIME);
+//   
+//       micro_log_info("I’d just like to interject for a moment...");
+//   
+//       micro_log_close();  
+//     }
 //
 //
 // Usage
@@ -58,9 +77,9 @@
 // to support logging from multiple threads, then define
 // MICRO_LOG_MULTITHREADED before including this file.
 //
-// (Almost) All function have two versions: one that interacts with a
-// global logger, and another that uses a logger instance you
-// supply. This is needed because most of the time you just want a
+// (Almost) All log function have two versions: one that interacts
+// with a global logger, and another that uses a logger instance you
+// supply. This is wanted because most of the time you just want a
 // global logger without the need to pass references to loggers, but
 // you may also need different loggers for different parts of your
 // application, hence both options are provided.
@@ -121,8 +140,8 @@
 // - windows support
 //
 
-#ifndef _MICRO_LOG_H_
-#define _MICRO_LOG_H_
+#ifndef MICRO_LOG
+#define MICRO_LOG
 
 #define MICRO_LOG_MAJOR 0
 #define MICRO_LOG_MINOR 1
@@ -132,23 +151,47 @@ extern "C" {
 #endif
 
 #ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200809L // dprintf, vdprintf (UNIX)
+  #define _POSIX_C_SOURCE 200809L // dprintf, vdprintf (UNIX)
 #endif
-  
+
 //
 // Configuration
 //
   
 // Config: Enable thread safety by defining MICRO_LOG_MULTITHREADED
+//
 // Note: This is optional since it adds a (tiny) performance setback
 // since printing must be regulated via a mutex.
 //
 //#define MICRO_LOG_MULTITHREADED
 
 // Config: Enable logging on operating system sockets
+//
 // Note: Optional since this may not be needed by most applications
 //
 //#define MICRO_LOG_SOCKETS
+
+// Config: compiler-time log level, value 0 to 6 (included)
+//
+// All calls to log functions in the family `micro_log_{level}` and
+// `micro_log_{level}2` with less priority than this will not be
+// compiled at all. Setting this to an high priority will save
+// performance since the log level will not have to be checked during
+// runtime, and the log functions will not be called at all.
+//
+// Set this to one among the MICRO_LOG_LEVEL_* values:
+//
+//     MICRO_LOG_LEVEL_{TRACE|DEBUF|INFO|WARN|ERROR|FATAL|DISABLED}
+//
+#define MICRO_LOG_LEVEL_DEF MICRO_LOG_LEVEL_TRACE
+  
+// Config: Prefix for all functions
+// For function inlining, set this to `static inline` and then define
+// the implementation in all the files
+//
+#ifndef MICRO_LOG_DEF
+  #define MICRO_LOG_DEF extern
+#endif
 
 //
 // Errors
@@ -240,73 +283,128 @@ extern "C" {
 #define MICRO_LOG_LGRAY(x) "\x1B[90m" x MICRO_LOG_RST
 
 // Global logger
-    
+
+// Functions
+// micro_log_{write|trace|debug|info|warn|error|fatal}
+  
 #define micro_log_write(log_level, ...)                       \
   micro_log_write2(&micro_log_global, log_level, __VA_ARGS__)
 
-#define micro_log_trace(...)                          \
-  micro_log_write(MICRO_LOG_LEVEL_TRACE, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_TRACE
+  #define micro_log_trace(...)                          \
+    micro_log_write(MICRO_LOG_LEVEL_TRACE, __VA_ARGS__)
+#else
+  #define micro_log_trace(...) micro_log_disabled()
+#endif
 
-#define micro_log_debug(...)                          \
-  micro_log_write(MICRO_LOG_LEVEL_DEBUG, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_DEBUG
+  #define micro_log_debug(...)                          \
+    micro_log_write(MICRO_LOG_LEVEL_DEBUG, __VA_ARGS__)
+#else
+  #define micro_log_debug(...) micro_log_disabled()
+#endif
 
-#define micro_log_info(...)                           \
-  micro_log_write(MICRO_LOG_LEVEL_INFO, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_INFO
+  #define micro_log_info(...)                           \
+    micro_log_write(MICRO_LOG_LEVEL_INFO, __VA_ARGS__)
+#else
+  #define micro_log_info(...) micro_log_disabled()
+#endif
 
-#define micro_log_warn(...)                           \
-  micro_log_write(MICRO_LOG_LEVEL_WARN, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_WARN
+  #define micro_log_warn(...)                           \
+    micro_log_write(MICRO_LOG_LEVEL_WARN, __VA_ARGS__)
+#else
+  #define micro_log_warn(...) micro_log_disabled()
+#endif
 
-#define micro_log_error(...)                          \
-  micro_log_write(MICRO_LOG_LEVEL_ERROR, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_ERROR
+  #define micro_log_error(...)                          \
+    micro_log_write(MICRO_LOG_LEVEL_ERROR, __VA_ARGS__)
+#else
+  #define micro_log_error(...) micro_log_disabled()
+#endif
 
-#define micro_log_fatal(...)                          \
-  micro_log_write(MICRO_LOG_LEVEL_FATAL, __VA_ARGS__)
-
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_FATAL
+  #define micro_log_fatal(...)                          \
+    micro_log_write(MICRO_LOG_LEVEL_FATAL, __VA_ARGS__)
+#else
+  #define micro_log_fatal(...) micro_log_disabled()
+#endif
+  
 // Local logger
-    
+
+// Functions
+// micro_log_{write2|trace2|debug2|info2|warn2|error2|fatal2}
+
 #define micro_log_write2(micro_log, log_level, ...)                     \
   _micro_log_write_impl(micro_log, log_level, __FILE__, __LINE__, __VA_ARGS__)
 
-#define micro_log_trace2(micro_log, ...)                          \
-  micro_log_write2(micro_log, MICRO_LOG_LEVEL_TRACE, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_TRACE
+  #define micro_log_trace2(micro_log, ...)                          \
+    micro_log_write2(micro_log, MICRO_LOG_LEVEL_TRACE, __VA_ARGS__)
+#else
+  #define micro_log_trace2(micro_log, ...) micro_log_disabled()
+#endif
 
-#define micro_log_debug2(micro_log, ...)                          \
-  micro_log_write2(micro_log, MICRO_LOG_LEVEL_DEBUG, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_DEBUG
+  #define micro_log_debug2(micro_log, ...)                          \
+    micro_log_write2(micro_log, MICRO_LOG_LEVEL_DEBUG, __VA_ARGS__)
+#else
+  #define micro_log_debug2(micro_log, ...) micro_log_disabled()
+#endif
 
-#define micro_log_info2(micro_log, ...)                           \
-  micro_log_write2(micro_log, MICRO_LOG_LEVEL_INFO, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_INFO
+  #define micro_log_info2(micro_log, ...)                           \
+    micro_log_write2(micro_log, MICRO_LOG_LEVEL_INFO, __VA_ARGS__)
+#else
+  #define micro_log_info2(micro_log, ...) micro_log_disabled()
+#endif
 
-#define micro_log_warn2(micro_log, ...)                           \
-  micro_log_write2(micro_log, MICRO_LOG_LEVEL_WARN, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_WARN
+  #define micro_log_warn2(micro_log, ...)                           \
+    micro_log_write2(micro_log, MICRO_LOG_LEVEL_WARN, __VA_ARGS__)
+#else
+  #define micro_log_warn2(micro_log, ...) micro_log_disabled()
+#endif
 
-#define micro_log_error2(micro_log, ...)                          \
-  micro_log_write2(micro_log, MICRO_LOG_LEVEL_ERROR, __VA_ARGS__)
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_ERROR
+  #define micro_log_error2(micro_log, ...)                          \
+    micro_log_write2(micro_log, MICRO_LOG_LEVEL_ERROR, __VA_ARGS__)
+#else
+  #define micro_log_error2(micro_log, ...) micro_log_disabled()
+#endif
 
-#define micro_log_fatal2(micro_log, ...)                          \
-  micro_log_write2(micro_log, MICRO_LOG_LEVEL_FATAL, __VA_ARGS__)
-
+#if MICRO_LOG_LEVEL_DEF <= MICRO_LOG_LEVEL_FATAL
+  #define micro_log_fatal2(micro_log, ...)                          \
+    micro_log_write2(micro_log, MICRO_LOG_LEVEL_FATAL, __VA_ARGS__)
+#else
+  #define micro_log_fatal2(micro_log, ...) micro_log_disabled()
+#endif
+  
 //
 // Types and functions
 //
 
-enum MicroLogLevel {
-  MICRO_LOG_LEVEL_TRACE = 0,
-  MICRO_LOG_LEVEL_DEBUG,
-  MICRO_LOG_LEVEL_INFO,
-  MICRO_LOG_LEVEL_WARN,
-  MICRO_LOG_LEVEL_ERROR,
-  MICRO_LOG_LEVEL_FATAL,
-  MICRO_LOG_LEVEL_DISABLED,
-  _MICRO_LOG_LEVEL_MAX,
-};
+// Use the MICRO_LOG_LEVEL_ macros for this value
+typedef unsigned int MicroLogLevel;
+#define MICRO_LOG_LEVEL_TRACE     0
+#define MICRO_LOG_LEVEL_DEBUG     1
+#define MICRO_LOG_LEVEL_INFO      2
+#define MICRO_LOG_LEVEL_WARN      3
+#define MICRO_LOG_LEVEL_ERROR     4
+#define MICRO_LOG_LEVEL_FATAL     5
+#define MICRO_LOG_LEVEL_DISABLED  6
+#define MICRO_LOG_LEVEL_MAX       7
+
 
 #ifdef MICRO_LOG_SOCKETS
-enum MicroLogProto
+typedef enum
 {
   MICRO_LOG_PROTO_TCP = 0,
   MICRO_LOG_PROTO_UDP,
   _MICRO_LOG_PROTO_MAX
-};
+} MicroLogProto;
 #endif // MICRO_LOG_SOCKETS
 
 typedef int micro_log_error;
@@ -323,7 +421,7 @@ typedef struct {
   // Only logs that are of an higher or equal priority than this will
   // be logged.
   // Default value is MICRO_LOG_LEVEL_TRACE
-  enum MicroLogLevel log_level;
+  MicroLogLevel log_level;
   // (optional) Pointer to output file
   FILE *file;
   #ifdef MICRO_LOG_SOCKETS
@@ -353,19 +451,19 @@ extern MicroLog micro_log_global;
 // Initialize the global logger
 //
 // Notes: remember to close it when you are done
-micro_log_error micro_log_init(void);
+MICRO_LOG_DEF micro_log_error micro_log_init(void);
 
 // Read settings from file
 //
 // Check out the file named `settings` for additional information
 // Notes: this expects the global logger to be already initialzied
-micro_log_error micro_log_from_file(char *filename);
+MICRO_LOG_DEF micro_log_error micro_log_from_file(char *filename);
 
 // Close the global logger
-micro_log_error micro_log_close(void);
+MICRO_LOG_DEF micro_log_error micro_log_close(void);
 
 // Flush all current output streams in the global logger
-micro_log_error micro_log_flush(void);
+MICRO_LOG_DEF micro_log_error micro_log_flush(void);
 
 // Set output flags to global logger
 //
@@ -374,15 +472,16 @@ micro_log_error micro_log_flush(void);
 // colored or to be serialized in some format like json.
 //
 // Check out the MICRO_LOG_FLAG_ values to see all the flags available
-micro_log_error micro_log_set_flags(long unsigned int flags_bitfield);
+MICRO_LOG_DEF micro_log_error
+micro_log_set_flags(long unsigned int flags_bitfield);
 
 // Set the log level to global logger
 //
 // Only the logs with an higher level of the current log level will be
 // printed.
 //
-// Check out the MicroLogLevel enum for a list of the supported levels.
-micro_log_error micro_log_set_level(enum MicroLogLevel level);
+// Check out the MicroLogLevel for a list of the supported levels.
+MICRO_LOG_DEF micro_log_error micro_log_set_level(MicroLogLevel level);
 
 // Set the output streams to the global logger
 //
@@ -392,13 +491,13 @@ micro_log_error micro_log_set_level(enum MicroLogLevel level);
 // should have already opened it with `miro_log_set_file`. Likewise
 // for the other options. By default, when you add a new output
 // stream, this will be automatically registered.
-micro_log_error micro_log_set_out(int out_flags);
+MICRO_LOG_DEF micro_log_error micro_log_set_out(int out_flags);
 
 // Set output file of the global logger
 //
 // The logger will write logs to [filename]. The logger will create
 // the file if it does not exist.
-micro_log_error micro_log_set_file(char* filename);
+MICRO_LOG_DEF micro_log_error micro_log_set_file(char* filename);
 
 #ifdef MICRO_LOG_SOCKETS
 
@@ -406,10 +505,10 @@ micro_log_error micro_log_set_file(char* filename);
 //
 // Note: You need to have defined MICRO_LOG_SOCKETS before including
 // this header in torder to use this function
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 micro_log_set_socket_inet(char* addr,
                           int port,
-                          enum MicroLogProto protocol);
+                          MicroLogProto protocol);
 
 #if defined(__unix__) || defined(__unix)
 
@@ -417,7 +516,7 @@ micro_log_set_socket_inet(char* addr,
 //
 // Note: You need to have defined MICRO_LOG_SOCKETS before including
 // this header, and be in an unix system to use this function.
-micro_log_error micro_log_set_socket_unix(char* path);
+MICRO_LOG_DEF micro_log_error micro_log_set_socket_unix(char* path);
 
 #endif // __unix__
 
@@ -429,56 +528,81 @@ micro_log_error micro_log_set_socket_unix(char* path);
 // These are equivalent to the global ones but they take an additional
 // MicroLog first argument, which is the logger what will be modified.
 
-micro_log_error micro_log_init2(MicroLog *micro_log);
+MICRO_LOG_DEF micro_log_error micro_log_init2(MicroLog *micro_log);
+
 // micro_log_from_file2 expects [micro_log] to be already initialzied
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 micro_log_from_file2(MicroLog *micro_log, char *filename);
-micro_log_error micro_log_close2(MicroLog *micro_log);
-micro_log_error micro_log_flush2(MicroLog *micro_log);
-micro_log_error micro_log_set_flags2(MicroLog *micro_log,
-                          long unsigned int flags_bitfield);
-micro_log_error
+  
+MICRO_LOG_DEF micro_log_error micro_log_close2(MicroLog *micro_log);
+  
+MICRO_LOG_DEF micro_log_error micro_log_flush2(MicroLog *micro_log);
+  
+MICRO_LOG_DEF micro_log_error
+micro_log_set_flags2(MicroLog *micro_log,
+                     long unsigned int flags_bitfield);
+  
+MICRO_LOG_DEF micro_log_error
 micro_log_set_level2(MicroLog *micro_log,
-                          enum MicroLogLevel level);
-micro_log_error micro_log_set_out2(MicroLog *micro_log, int out_flags);
-micro_log_error micro_log_set_file2(MicroLog *micro_log,
-                         char* filename);
+                     MicroLogLevel level);
+  
+MICRO_LOG_DEF micro_log_error
+micro_log_set_out2(MicroLog *micro_log, int out_flags);
+  
+MICRO_LOG_DEF micro_log_error
+micro_log_set_file2(MicroLog *micro_log,
+                    char* filename);
+  
 #ifdef MICRO_LOG_SOCKETS
-micro_log_error
+
+MICRO_LOG_DEF micro_log_error
 micro_log_set_socket_inet2(MicroLog *micro_log,
                            char* addr,
                            int port,
-                           enum MicroLogProto protocol);
+                           MicroLogProto protocol);
+
 #if defined(__unix__) || defined(__unix)
-micro_log_error
+
+MICRO_LOG_DEF micro_log_error
 micro_log_set_socket_unix2(MicroLog *micro_log,
                            char* path);
+
 #endif // __unix__
+
 #endif // MICRO_LOG_SOCKETS
 
 // Misc
 
+// Inline function that just returns MICRO_LOG_OK
+// This is needed when log level is disabled at compile time, and
+// it needs a definition in every translation unit to be inlined
+static inline int micro_log_disabled(void)
+{
+    return MICRO_LOG_OK;
+}
+  
 // Get a string of a certain log level, with an optional color
-const char*
-micro_log_level_string(enum MicroLogLevel level, bool color);
+MICRO_LOG_DEF const char*
+micro_log_level_string(MicroLogLevel level, bool color);
 
 // The central log function
 //
 // All other functions call this one for printing. It handles all the
 // flags and calls `_micro_log_print_outputs`.
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 _micro_log_write_impl(MicroLog *micro_log,
-                      enum MicroLogLevel level,
+                      MicroLogLevel level,
                       const char* file,
                       int line,
                       const char *fmt, ...);
 
 // Wraps `_micro_log_print_outputs_args`
-micro_log_error _micro_log_print_outputs(MicroLog *micro_log,
-                                         const char* fmt, ...);
+MICRO_LOG_DEF micro_log_error
+_micro_log_print_outputs(MicroLog *micro_log,
+                         const char* fmt, ...);
 
 // Print formatted string in multiple outputs.
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 _micro_log_print_outputs_args(MicroLog *micro_log,
                               const char* fmt,
                               va_list args);
@@ -547,65 +671,68 @@ _micro_log_print_outputs_args(MicroLog *micro_log,
 
 MicroLog micro_log_global;
 
-micro_log_error micro_log_init(void)
+MICRO_LOG_DEF micro_log_error micro_log_init(void)
 {
   return micro_log_init2(&micro_log_global);
 }
 
-micro_log_error micro_log_from_file(char *filename)
+MICRO_LOG_DEF micro_log_error micro_log_from_file(char *filename)
 {
   return micro_log_from_file2(&micro_log_global, filename);
 }
 
-micro_log_error micro_log_close(void)
+MICRO_LOG_DEF micro_log_error micro_log_close(void)
 {
   return micro_log_close2(&micro_log_global);
 }
 
-micro_log_error micro_log_flush(void)
+MICRO_LOG_DEF micro_log_error micro_log_flush(void)
 {
   return micro_log_flush2(&micro_log_global);
 }
 
-micro_log_error micro_log_set_flags(long unsigned int flags_bitfield)
+MICRO_LOG_DEF micro_log_error
+micro_log_set_flags(long unsigned int flags_bitfield)
 {
   return micro_log_set_flags2(&micro_log_global, flags_bitfield);
 }
 
-micro_log_error micro_log_set_level(enum MicroLogLevel level)
+MICRO_LOG_DEF micro_log_error micro_log_set_level(MicroLogLevel level)
 {
   return micro_log_set_level2(&micro_log_global, level);
 }
 
-micro_log_error micro_log_set_out(int out_flags)
+MICRO_LOG_DEF micro_log_error micro_log_set_out(int out_flags)
 {
   return micro_log_set_out2(&micro_log_global, out_flags);
 }
 
-micro_log_error micro_log_set_file(char* filename)
+MICRO_LOG_DEF micro_log_error micro_log_set_file(char* filename)
 {
   return micro_log_set_file2(&micro_log_global, filename);
 }
 
 #ifdef MICRO_LOG_SOCKETS
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 micro_log_set_socket_inet(char* addr,
                           int port,
-                          enum MicroLogProto protocol)
+                          MicroLogProto protocol)
 {
   return micro_log_set_socket_inet2(&micro_log_global, addr, port, protocol);
 }
 
 #if defined(__unix__) || defined(__unix)
-micro_log_error micro_log_set_socket_unix(char* path)
+
+MICRO_LOG_DEF micro_log_error micro_log_set_socket_unix(char* path)
 {
   return micro_log_set_socket_unix2(&micro_log_global, path);
 }
+
 #endif // __unix__
 
 #endif // MICRO_LOG_SOCKETS
 
-micro_log_error micro_log_init2(MicroLog *micro_log)
+MICRO_LOG_DEF micro_log_error micro_log_init2(MicroLog *micro_log)
 {
   if (micro_log == NULL)
     return MICRO_LOG_ERROR_LOGGER_NULL;
@@ -627,11 +754,11 @@ micro_log_error micro_log_init2(MicroLog *micro_log)
   pthread_mutex_init(&micro_log->write_mutex, NULL);
   #endif
 
-  micro_log_write2(micro_log, MICRO_LOG_LEVEL_INFO, "Logger initialized");
+  micro_log_info2(micro_log, "Logger initialized");
   return MICRO_LOG_OK;
 }
 
-int _micro_log_get_spaces(char* str, int max)
+MICRO_LOG_DEF int _micro_log_get_spaces(char* str, int max)
 {
   int spaces = 0;
   while((*(str + spaces) == ' ' || *(str + spaces) == '\t') && spaces < max)
@@ -639,7 +766,7 @@ int _micro_log_get_spaces(char* str, int max)
   return spaces;
 }
 
-int _micro_log_get_word_len(char* str, int max)
+MICRO_LOG_DEF int _micro_log_get_word_len(char* str, int max)
 {
   int letters = 0;
   while(*(str+letters) != ' '
@@ -650,7 +777,7 @@ int _micro_log_get_word_len(char* str, int max)
   return letters;
 }
 
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 micro_log_from_file2(MicroLog *micro_log, char *filename)
 {
   if (micro_log == NULL)
@@ -809,7 +936,7 @@ micro_log_from_file2(MicroLog *micro_log, char *filename)
     {
       char* addr;
       int port;
-      enum MicroLogProto proto;
+      MicroLogProto proto;
       
       int pos = 6;
       pos += _micro_log_get_spaces(line + 6, len - 6);
@@ -912,7 +1039,7 @@ micro_log_from_file2(MicroLog *micro_log, char *filename)
   return error;
 }
 
-micro_log_error micro_log_close2(MicroLog *micro_log)
+MICRO_LOG_DEF micro_log_error micro_log_close2(MicroLog *micro_log)
 {
   if (micro_log == NULL)
     return MICRO_LOG_ERROR_LOGGER_NULL;
@@ -967,7 +1094,7 @@ micro_log_error micro_log_close2(MicroLog *micro_log)
 
 _Static_assert(_MICRO_LOG_OUT_MAX == (1 << 4),
                "Updated MICRO_LOG_OUT_MAX, maybe should also update micro_log_flush2");
-micro_log_error micro_log_flush2(MicroLog *micro_log)
+MICRO_LOG_DEF micro_log_error micro_log_flush2(MicroLog *micro_log)
 {
   if (micro_log == NULL)
     return MICRO_LOG_ERROR_LOGGER_NULL;
@@ -997,7 +1124,7 @@ micro_log_error micro_log_flush2(MicroLog *micro_log)
   return error;
 }
   
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 micro_log_set_flags2(MicroLog *micro_log,
                      long unsigned int flags_bitfield)
 {
@@ -1016,14 +1143,14 @@ micro_log_set_flags2(MicroLog *micro_log,
   return error;
 }
 
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 micro_log_set_level2(MicroLog *micro_log,
-                     enum MicroLogLevel level)
+                     MicroLogLevel level)
 {
   if (micro_log == NULL)
     return MICRO_LOG_ERROR_LOGGER_NULL;
 
-  if (level > _MICRO_LOG_LEVEL_MAX)
+  if (level > MICRO_LOG_LEVEL_MAX)
     return MICRO_LOG_ERROR_UNKNOWN_LEVEL;
   
   micro_log_error error = MICRO_LOG_OK;
@@ -1042,7 +1169,8 @@ micro_log_set_level2(MicroLog *micro_log,
   return error;
 }
 
-micro_log_error micro_log_set_out2(MicroLog *micro_log, int out_flags)
+MICRO_LOG_DEF micro_log_error
+micro_log_set_out2(MicroLog *micro_log, int out_flags)
 {
   if (micro_log == NULL)
     return MICRO_LOG_ERROR_LOGGER_NULL;
@@ -1059,8 +1187,9 @@ micro_log_error micro_log_set_out2(MicroLog *micro_log, int out_flags)
   return error;
 }
 
-micro_log_error micro_log_set_file2(MicroLog *micro_log,
-                                    char* filename)
+MICRO_LOG_DEF micro_log_error
+micro_log_set_file2(MicroLog *micro_log,
+                    char* filename)
 {
   if (micro_log == NULL)
     return MICRO_LOG_ERROR_LOGGER_NULL;
@@ -1102,11 +1231,11 @@ micro_log_error micro_log_set_file2(MicroLog *micro_log,
 
 _Static_assert(_MICRO_LOG_PROTO_MAX == 2,
                "Updated MicroLogProto, should also update micro_log_set_socket_inet2");
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 micro_log_set_socket_inet2(MicroLog *micro_log,
                            char* addr,
                            int port,
-                           enum MicroLogProto protocol)
+                           MicroLogProto protocol)
 {
   if (micro_log == NULL)
     return MICRO_LOG_ERROR_LOGGER_NULL;
@@ -1178,7 +1307,8 @@ micro_log_set_socket_inet2(MicroLog *micro_log,
 }
 
 #if defined(__unix__) || defined(__unix)
-micro_log_error
+
+MICRO_LOG_DEF micro_log_error
 micro_log_set_socket_unix2(MicroLog* micro_log, char* path)
 {
   if (micro_log == NULL)
@@ -1235,9 +1365,10 @@ micro_log_set_socket_unix2(MicroLog* micro_log, char* path)
 
 #endif // MICRO_LOG_SOCKETS
 
-_Static_assert(_MICRO_LOG_LEVEL_MAX == 7,
+_Static_assert(MICRO_LOG_LEVEL_MAX == 7,
                "Updated MICRO_LOG_LEVEL, should also update micro_log_level_string");
-const char* micro_log_level_string(enum MicroLogLevel level, bool color)
+MICRO_LOG_DEF const char*
+micro_log_level_string(MicroLogLevel level, bool color)
 {
   switch(level)
   {
@@ -1261,9 +1392,9 @@ const char* micro_log_level_string(enum MicroLogLevel level, bool color)
   return "UNKNOWN";
 }
 
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 _micro_log_write_impl(MicroLog *micro_log,
-                      enum MicroLogLevel level,
+                      MicroLogLevel level,
                       const char* file,
                       int line,
                       const char *fmt, ...)
@@ -1494,7 +1625,7 @@ _micro_log_write_impl(MicroLog *micro_log,
 #undef COLOR2
 }
 
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 _micro_log_print_outputs(MicroLog *micro_log, const char* fmt, ...)
 {
   micro_log_error error;
@@ -1509,7 +1640,7 @@ _micro_log_print_outputs(MicroLog *micro_log, const char* fmt, ...)
 
 _Static_assert(_MICRO_LOG_OUT_MAX == (1 << 4),
                "Updated MICRO_LOG_OUT, should also update _micro_log_print_outputs_args");
-micro_log_error
+MICRO_LOG_DEF micro_log_error
 _micro_log_print_outputs_args(MicroLog *micro_log,
                               const char* fmt,
                               va_list args)
@@ -1585,14 +1716,12 @@ _micro_log_print_outputs_args(MicroLog *micro_log,
 #define MICRO_LOG_MULTITHREADED
 #include "micro-log.h"
 
-#include <stdio.h>
-
 int main(void)
 {
   micro_log_init();
   micro_log_set_flags(MICRO_LOG_FLAG_LEVEL 
                       | MICRO_LOG_FLAG_DATE  
-                      | MICRO_LOG_FLAG_TIME)
+                      | MICRO_LOG_FLAG_TIME);
   micro_log_set_file("out");
   
   micro_log_info("I’d just like to interject for a moment...");
@@ -1607,4 +1736,4 @@ int main(void)
 }
 #endif
 
-#endif // _MICRO_LOG_H_
+#endif // MICRO_LOG

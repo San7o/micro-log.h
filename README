@@ -1,5 +1,5 @@
 micro-log.h
------------
+===========
 
 Header-only, configurable, thread safe logging framework in C99.
 
@@ -24,8 +24,28 @@ Features
  - Thread-safe logging
  - read settings from file (see the file `settings`)
  - optional colored output
+ - compile time settings
 
 Initial implementation based on Oak: https://github.com/San7o/oak
+
+
+Example
+-------
+
+   #define MICRO_LOG_IMPLEMENTATION
+   #include "micro-log.h"
+
+   int main(void)
+   {
+      micro_log_init();
+      micro_log_set_flags(MICRO_LOG_FLAG_LEVEL 
+                          | MICRO_LOG_FLAG_DATE  
+                          | MICRO_LOG_FLAG_TIME);
+  
+      micro_log_info("I’d just like to interject for a moment...");
+  
+      micro_log_close();  
+    }
 
 
 Usage
@@ -55,12 +75,12 @@ setback since printing must be regulated via a mutex.  If you want
 to support logging from multiple threads, then define
 MICRO_LOG_MULTITHREADED before including the header file.
 
-(Almost) All function have two versions: one that interacts with a
+(Almost) All log function have two versions: one that interacts with a
 global logger, and another that uses a logger instance you
-supply. This is needed because most of the time you just want a
-global logger without the need to pass references to loggers, but
-you may also need different loggers for different parts of your
-application, hence both options are provided.
+supply. This is wanted because most of the time you just want a global
+logger without the need to pass references to loggers, but you may
+also need different loggers for different parts of your application,
+hence both options are provided.
 
 We will see some examples with the global logger. To use a local
 one, you just need to use the version '2' of the functions and pass
