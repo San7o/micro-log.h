@@ -183,7 +183,9 @@ extern "C" {
 //
 //     MICRO_LOG_LEVEL_{TRACE|DEBUF|INFO|WARN|ERROR|FATAL|DISABLED}
 //
-#define MICRO_LOG_LEVEL_DEF MICRO_LOG_LEVEL_TRACE
+#ifndef MICRO_LOG_LEVEL_DEF
+  #define MICRO_LOG_LEVEL_DEF MICRO_LOG_LEVEL_TRACE
+#endif
   
 // Config: Prefix for all functions
 // For function inlining, set this to `static inline` and then define
