@@ -6,7 +6,7 @@
 #
 # Compiler flags
 #
-CFLAGS=-Wall -Werror -Wpedantic -ggdb -std=c99
+CFLAGS=-Wall -Werror -Wpedantic -Wextra -ggdb -std=c99
 LDFLAGS=
 CC=gcc
 

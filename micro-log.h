@@ -858,7 +858,7 @@ micro_log_from_file2(MicroLog *micro_log, char *filename)
     }
     else if (strncmp(line, "flags:", 6) == 0)
     {
-      int pos = 6;
+      size_t pos = 6;
       long unsigned int flags = 0;
       pos += _micro_log_get_spaces(line + 6, len - 6);
       while (pos <= len)
@@ -922,7 +922,7 @@ micro_log_from_file2(MicroLog *micro_log, char *filename)
     }
     else if (strncmp(line, "file:", 5) == 0)
     {
-      int pos = 5;
+      size_t pos = 5;
       pos += _micro_log_get_spaces(line + pos, len - 6);
       int file_str_len = _micro_log_get_word_len(line + pos, len - pos);
       if (pos + file_str_len < len)
