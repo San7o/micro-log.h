@@ -779,6 +779,40 @@ MICRO_LOG_DEF int _micro_log_get_word_len(char* str, int max)
   return letters;
 }
 
+static ssize_t _micro_log_getline(char  **lineptr,
+                                  size_t *n,
+                                  FILE   *stream)
+{
+  if (lineptr == NULL || n == NULL || stream == NULL)
+    return -1;
+  
+  size_t len = 0;
+  int c;
+  long pos = ftell(stream);
+  if (pos == -1)
+    return -1;
+  
+  while((c = fgetc(stream)) != EOF)
+  {
+    len++;
+    if (c == '\n')
+      break;
+  }
+
+  if (c == EOF && len == 0)
+    return -1;
+
+  char *buff = realloc(*lineptr, len + 1);
+  if (!buff)
+    return -1;
+  *lineptr = buff;
+  fseek(stream, pos, SEEK_SET);
+  size_t bytes_read = fread(*lineptr, 1, len, stream);
+  (*lineptr)[bytes_read] = '\0';
+  *n = bytes_read;
+  return bytes_read;
+}
+
 MICRO_LOG_DEF micro_log_error
 micro_log_from_file2(MicroLog *micro_log, char *filename)
 {
@@ -809,7 +843,7 @@ micro_log_from_file2(MicroLog *micro_log, char *filename)
   char *line = NULL;
   size_t len;
   int spaces;
-  while(getline(&line, &len, file) >= 0)
+  while(_micro_log_getline(&line, &len, file) >= 0)
   {
     if (strncmp(line, "#", 1) == 0)
     {
